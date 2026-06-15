@@ -1,0 +1,7 @@
+{
+  "name": "token-saver-scripts",
+  "private": true,
+  "dependencies": {
+    "@opencode-ai/sdk": "latest"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "truncate": {
+    "bash": {
+      "maxChars": 2000,
+      "enabled": true
+    },
+    "read": {
+      "maxChars": 4000,
+      "enabled": true
+    },
+    "grep": {
+      "maxChars": 1500,
+      "enabled": true
+    },
+    "glob": {
+      "maxChars": 1000,
+      "enabled": true
+    },
+    "webfetch": {
+      "maxChars": 4000,
+      "enabled": true
+    },
+    "websearch": {
+      "maxChars": 3000,
+      "enabled": true
+    }
+  },
+  "neverTruncatePatterns": [
+    "package.json",
+    "tsconfig.json",
+    "opencode.json",
+    ".env",
+    ".env.example",
+    "docker-compose.yml",
+    ".gitignore",
+    "Makefile",
+    "Dockerfile",
+    "SKILL.md"
+  ],
+  "compacting": {
+    "enabled": true,
+    "maxSummaryChars": 2000
+  },
+  "trim": {
+    "defaultKeepLast": 10,
+    "maxSummaryChars": 2000
+  }
+}
