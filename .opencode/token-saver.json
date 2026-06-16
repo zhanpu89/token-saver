@@ -23,6 +23,10 @@
     "websearch": {
       "maxChars": 3000,
       "enabled": true
+    },
+    "task": {
+      "maxChars": 3000,
+      "enabled": true
     }
   },
   "neverTruncatePatterns": [
@@ -44,7 +48,6 @@
     "maxSummaryChars": 2000
   },
   "trim": {
-    "defaultKeepLast": 10,
-    "maxSummaryChars": 2000
+    "defaultKeepLast": 10
   }
 }

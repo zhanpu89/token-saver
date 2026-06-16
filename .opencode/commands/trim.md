@@ -8,16 +8,6 @@ You are compressing a conversation history. The user arguments are: $ARGUMENTS
 
 Parse `keep_last=N` from arguments: if a valid number N is provided (e.g. `keep_last=5`), keep the last N messages as-is and compress everything before that. If the argument is absent, empty, or not recognized, default to keeping the last 10 messages.
 
-The current session is running a 6-phase software engineering pipeline:
-1. PRD — 需求分析与文档生成
-2. 架构设计 — SAD + tech-stack
-3. 详细设计 — 模块拆解 + OpenAPI + DDL 草稿
-4. 数据库设计 — DDL 脚本
-5. 编码开发 — 代码实现
-6. 测试 — 用例设计 + 测试代码
-
-Each phase includes a review gate (review-expert / code-reviewer) as a sub-step, not as a separate phase.
-
 Apply these rules strictly:
 
 ### 1. 丢弃的内容
@@ -27,8 +17,7 @@ Apply these rules strictly:
 - 已完成的 SKILL.md 工作流指令内容（只保留结果摘要）
 
 ### 2. 保留的内容
-- 当前所处的流水线阶段（如 "Phase 3/6: 详细设计"）
-- 已完成阶段的产出物清单（doc/ 目录中的文件路径）
+- 当前任务目标和状态
 - 所有已修改的文件路径和变更摘要
 - 关键决策及理由
 - 仍存在异常的错误信息（完整保留）
@@ -36,11 +25,8 @@ Apply these rules strictly:
 
 ### 3. 输出格式
 ```
-Pipeline: Phase <N>/6 - <phase_name>
+Task: <current goal>
 Status: <in_progress|completed|blocked>
-Artifacts:
-  - doc/prd/xxx.md
-  - doc/arch/xxx.md
 Files Changed:
   - path/to/file.ts: <what changed>
 Decisions:

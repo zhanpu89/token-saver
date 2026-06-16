@@ -1,94 +1,59 @@
-# my-skills
+# token-saver
 
-OpenCode AI 技能集合 —— 10 个指导 AI 代理完成软件工程各阶段的指令集。
+opencode 插件 + `/trim` 命令 + SDK 脚本，用于在编码会话中自动/手动裁剪冗余上下文，节省 **40-60% token**。
 
-> 完整文档和安装指南请见项目根目录 [README.md](../README.md)
+## 组件
 
-## 技能一览
-
-| 技能 | 角色 | 工具名 |
-|------|------|--------|
-| **prd-writer** | 需求分析 → PRD | `call_prd_writer` |
-| **review-expert** | 文档/用例评审 | `call_review_expert` |
-| **system-architect** | 架构设计 + 技术栈 | `call_system_architect` |
-| **task-decomposer** | 详设拆分 + 项目规则 | `call_task_decomposer` |
-| **code-developer** | 编码实现 | `call_code_developer` |
-| **code-reviewer** | 代码评审 | `call_code_reviewer` |
-| **tester** | 测试用例 + 测试代码 | `call_tester` |
-| **dba-designer** | 数据库 DDL 设计 | `call_dba_designer` |
-| **ai-memory** | AI 记忆持久化（桥梁） | `call_ai_memory` |
-| **pipeline-orchestrator** | 全流程编排器 | `call_pipeline_orchestrator` |
-
-## 目录结构
-
-```
-skills/{skill}/
-├── SKILL.md          # 技能指令（YAML + 工作流）
-├── resources/        # 参考文档（术语表、检查清单、模式参考）
-└── templates/        # 输出模板
-```
-
-## 插件
-
-| 插件 | 文件 | 职责 |
+| 组件 | 文件 | 职责 |
 |------|------|------|
-| 技能编排 | `plugins/skill-agent.ts` | 将 10 个技能暴露为 `call_*` 自定义工具，负责 SKILL.md 懒加载和 subagent 调度 |
-| 上下文治理 | `plugins/token-saver.ts` | 头尾保留截断策略（前 30% + 后 70%）、智能错误检测免截断、`session.compacting` 优化压缩质量，节省 40-60% token |
+| 自动裁剪插件 | `plugins/token-saver.ts` | 工具输出头尾截断（前 30% + 后 70%）、智能错误检测免截断、`session.compacting` 优化压缩质量 |
+| 手动压缩命令 | `commands/trim.md` | `/trim [keep_last=N]` 手动压缩当前会话 |
+| SDK 批处理脚本 | `../scripts/trim-session.ts` | 批量压缩多个会话，支持 dry-run |
+| 配置文件 | `token-saver.json` | 各工具截断阈值、白名单、压缩参数 |
 
-## 命令
+## 工作原理
 
-| 命令 | 文件 | 职责 |
-|------|------|------|
-| `/trim [keep_last=N]` | `commands/trim.md` | 手动压缩当前会话，按流水线阶段保留关键上下文 |
+### 自动截断
 
-## 最佳组合：RTK + token-saver
+`tool.execute.after` 钩子拦截工具输出，对超过阈值的输出做头尾保留截断：
 
-[RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk) 是 bash 命令输出的智能压缩工具（62K+ star），与 token-saver 互补叠加。
+| 工具 | 默认阈值 | 策略 |
+|------|----------|------|
+| bash | 2000 chars | 前 30% + 后 70%，在换行处分割 |
+| read | 4000 chars | 同上 |
+| grep | 1500 chars | 同上 |
+| glob | 1000 chars | 同上 |
+| webfetch | 4000 chars | 同上 |
+| websearch | 3000 chars | 同上 |
 
-### 分工
+**例外**：输出包含 `error`/`fail`/`exception`/`traceback` 等关键词时不截断（保留完整调试信息）。
+**白名单**：`package.json`、`tsconfig.json`、`opencode.json`、`token-saver.json`、`.env`、`Dockerfile` 等配置文件不截断。
 
-| 层 | 谁管 | 技术 | 节省 |
-|---|---|---|---|
-| Bash 命令输出 | **RTK** | git diff 折叠、test 分组、ls 去重 | 60-90% |
-| read/grep/glob | **token-saver** | 截断 + 白名单 | 50-70% |
-| 会话压缩 | **token-saver** | compaction hook | 10-15% |
-| 手动控制 | **`/trim`** | LLM 总结 | 15-20% |
-| **叠加总计** | — | — | **60-70%** |
+### 会话压缩
 
-### 一键集成
+`experimental.session.compacting` 钩子在 LLM 压缩会话时注入精简指令，只保留：任务状态、修改的文件、关键决策、阻塞项。
 
-```bash
-# 1. 安装 RTK
-curl -fsSL https://rtk-ai.app/install | bash
+### 手动压缩
 
-# 2. 注入 opencode hook
-rtk init -g --opencode
+`/trim [keep_last=N]` — 由 LLM 总结会话历史，丢弃工具输出和中间步骤，保留关键上下文。
 
-# 3. 验证
-rtk gain
-```
+## 配置
 
-> **关键理解**：RTK 只拦截 `bash` 工具。opencode 的 `Read`/`Grep`/`Glob` 不走 bash hook——这正是 token-saver 必须存在的原因。两者配合才能全面覆盖。
-
-### 装了 RTK 后的配置调整
-
-编辑 `token-saver.json`，关闭 bash 截断以避免两次处理：
+编辑 `token-saver.json` 调整阈值：
 
 ```json
 {
   "truncate": {
-    "bash": { "maxChars": 5000, "enabled": false },
-    "read": { "maxChars": 4000, "enabled": true },
-    "grep": { "maxChars": 1500, "enabled": true },
-    "glob": { "maxChars": 1000, "enabled": true }
+    "bash": { "maxChars": 2000, "enabled": true },
+    "read": { "maxChars": 4000, "enabled": true }
   }
 }
 ```
 
-### 效果
+## SDK 脚本
 
-官方基准：30 分钟编码会话从 ~118K tokens 降至 ~24K（仅 RTK），叠加 token-saver 后预计 **~16-18K tokens**（省 **85%**）。
-
-## 配置
-
-调整各工具的截断阈值：编辑 `token-saver.json`。
+```sh
+cd scripts
+npm run trim              # 压缩所有会话
+npm run trim:dry          # 预览，不实际执行
+```

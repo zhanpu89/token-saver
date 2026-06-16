@@ -2,8 +2,9 @@
  * SDK 脚本：批量压缩 opencode 会话
  *
  * 用法：
- *   bun run scripts/trim-session.ts                    # 压缩所有会话
- *   bun run scripts/trim-session.ts <session-id>       # 压缩指定会话
+ *   bun run scripts/trim-session.ts                     # 压缩所有会话
+ *   bun run scripts/trim-session.ts --session=<id>      # 压缩指定会话
+ *   bun run scripts/trim-session.ts sess-xxx            # 压缩指定会话
  *   bun run scripts/trim-session.ts --dry-run           # 预览，不实际执行
  *
  * 本脚本通过 SDK 自建临时 server，无需外部 opencode 进程。
@@ -13,7 +14,7 @@
  * 依赖: npm install @opencode-ai/sdk
  */
 
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode, createOpencodeClient } from "@opencode-ai/sdk"
 import type { OpencodeClient } from "@opencode-ai/sdk"
 
 let client: OpencodeClient
@@ -21,7 +22,6 @@ let closeServer: (() => void) | null = null
 const baseUrl = process.env.OPENCODE_BASE_URL
 
 if (baseUrl) {
-  const { createOpencodeClient } = await import("@opencode-ai/sdk")
   client = createOpencodeClient({ baseUrl })
 } else {
   const oc = await createOpencode({ port: 0, timeout: 10000 })
@@ -38,7 +38,11 @@ interface SessionStats {
   totalChars: number
 }
 
-async function analyzeSession(sessionId: string): Promise<SessionStats> {
+interface MessagePart {
+  text?: string
+}
+
+async function analyzeSession(sessionId: string, title?: string): Promise<SessionStats> {
   const res = await client.session.messages({ path: { id: sessionId } })
   const messages = res.data ?? []
 
@@ -47,14 +51,14 @@ async function analyzeSession(sessionId: string): Promise<SessionStats> {
 
   for (const msg of messages) {
     const parts = msg.parts ?? []
-    const msgChars = parts.reduce((sum: number, p: any) => sum + (p.text?.length ?? 0), 0)
+    const msgChars = parts.reduce((sum: number, p: MessagePart) => sum + (p.text?.length ?? 0), 0)
     totalChars += msgChars
     if (msgChars > 5000) oversizedMessages++
   }
 
   return {
     id: sessionId,
-    title: sessionId,
+    title: title ?? sessionId,
     totalMessages: messages.length,
     oversizedMessages,
     totalChars,
@@ -62,14 +66,6 @@ async function analyzeSession(sessionId: string): Promise<SessionStats> {
 }
 
 async function trimSession(sessionId: string): Promise<void> {
-  const res = await client.session.messages({ path: { id: sessionId } })
-  const messages = res.data ?? []
-
-  if (messages.length === 0) {
-    console.log(`  ⏭  Skipped (no messages)`)
-    return
-  }
-
   if (DRY_RUN) {
     const stats = await analyzeSession(sessionId)
     console.log(
@@ -84,11 +80,14 @@ async function trimSession(sessionId: string): Promise<void> {
 }
 
 async function main() {
-  const targetId = process.argv.find(a => a.startsWith("sess-") || a.length === 36)
+  const sessionArg = process.argv.find(a => a.startsWith("--session="))
+  const targetId = sessionArg
+    ? sessionArg.slice("--session=".length)
+    : process.argv.find(a => a.startsWith("sess-"))
 
   if (targetId) {
     console.log(`\nAnalyzing session: ${targetId}`)
-    const stats = await analyzeSession(targetId)
+    const stats = await analyzeSession(targetId, targetId)
     console.log(`  Messages: ${stats.totalMessages}`)
     console.log(`  Oversized (>5K chars): ${stats.oversizedMessages}`)
     console.log(`  Total chars: ${(stats.totalChars / 1000).toFixed(0)}K`)
@@ -112,8 +111,8 @@ async function main() {
   const allStats: SessionStats[] = []
 
   for (const s of allSessions) {
-    console.log(`\nSession: ${s.id}`)
-    const stats = await analyzeSession(s.id)
+    console.log(`\nSession: ${s.title ?? s.id}`)
+    const stats = await analyzeSession(s.id, s.title)
     allStats.push(stats)
     console.log(
       `  ${stats.totalMessages} msgs, ${stats.oversizedMessages} oversized, ` +
@@ -134,7 +133,7 @@ async function main() {
   }
 }
 
-main().then(() => closeServer?.(), err => {
+main().then(() => closeServer?.()).catch(err => {
   const msg = err instanceof Error ? err.message : String(err)
   if (!baseUrl && (msg.includes("ECONNREFUSED") || msg.includes("connect") || msg.includes("timeout"))) {
     console.error("Cannot start opencode server. Try setting OPENCODE_BASE_URL to a running `opencode serve` instance.")
