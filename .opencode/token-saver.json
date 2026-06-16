@@ -29,6 +29,8 @@
     "package.json",
     "tsconfig.json",
     "opencode.json",
+    "token-saver.json",
+    "token-saver.jsonc",
     ".env",
     ".env.example",
     "docker-compose.yml",

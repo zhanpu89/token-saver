@@ -6,12 +6,28 @@
  *   bun run scripts/trim-session.ts <session-id>       # 压缩指定会话
  *   bun run scripts/trim-session.ts --dry-run           # 预览，不实际执行
  *
+ * 本脚本通过 SDK 自建临时 server，无需外部 opencode 进程。
+ * 也可连接已有 server：
+ *   OPENCODE_BASE_URL=http://localhost:4096 bun run scripts/trim-session.ts
+ *
  * 依赖: npm install @opencode-ai/sdk
  */
 
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencode } from "@opencode-ai/sdk"
+import type { OpencodeClient } from "@opencode-ai/sdk"
 
-const client = createOpencodeClient({ baseUrl: "http://localhost:4096" })
+let client: OpencodeClient
+let closeServer: (() => void) | null = null
+const baseUrl = process.env.OPENCODE_BASE_URL
+
+if (baseUrl) {
+  const { createOpencodeClient } = await import("@opencode-ai/sdk")
+  client = createOpencodeClient({ baseUrl })
+} else {
+  const oc = await createOpencode({ port: 0, timeout: 10000 })
+  client = oc.client
+  closeServer = () => oc.server.close()
+}
 const DRY_RUN = process.argv.includes("--dry-run")
 
 interface SessionStats {
@@ -63,10 +79,7 @@ async function trimSession(sessionId: string): Promise<void> {
     return
   }
 
-  await client.session.summarize({
-    path: { id: sessionId },
-    body: { strategy: "aggressive" },
-  })
+  await client.session.summarize({ path: { id: sessionId } })
   console.log(`  ✅ Compressed`)
 }
 
@@ -121,7 +134,13 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error("Failed:", err)
+main().then(() => closeServer?.(), err => {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (!baseUrl && (msg.includes("ECONNREFUSED") || msg.includes("connect") || msg.includes("timeout"))) {
+    console.error("Cannot start opencode server. Try setting OPENCODE_BASE_URL to a running `opencode serve` instance.")
+  } else {
+    console.error("Failed:", msg)
+  }
+  closeServer?.()
   process.exit(1)
 })

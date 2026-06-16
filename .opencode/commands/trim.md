@@ -4,9 +4,9 @@ description: 压缩对话历史以节省 token。用法: /trim [keep_last=N]
 
 ## 指令
 
-You are compressing a conversation history. The user specified: keep_last=$ARGUMENTS
+You are compressing a conversation history. The user arguments are: $ARGUMENTS
 
-Parse `keep_last=N` from arguments: if provided, keep the last N messages as-is and compress everything before that. Default: keep last 10.
+Parse `keep_last=N` from arguments: if a valid number N is provided (e.g. `keep_last=5`), keep the last N messages as-is and compress everything before that. If the argument is absent, empty, or not recognized, default to keeping the last 10 messages.
 
 The current session is running a 6-phase software engineering pipeline:
 1. PRD — 需求分析与文档生成

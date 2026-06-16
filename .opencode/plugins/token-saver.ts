@@ -41,8 +41,10 @@ function loadConfig(worktree: string): Config {
     },
     neverTruncatePatterns: [
       "package.json", "tsconfig.json", "opencode.json",
+      "token-saver.json", "token-saver.jsonc",
       ".env", ".env.example", "docker-compose.yml",
       ".gitignore", "Makefile", "Dockerfile",
+      "SKILL.md",
     ],
     compacting: { enabled: true, maxSummaryChars: 2000 },
     trim: { defaultKeepLast: 10, maxSummaryChars: 2000 },
@@ -64,10 +66,16 @@ function truncate(text: string, maxLen: number, label: string): string {
   const tailLen = maxLen - headLen
 
   const headEnd = text.lastIndexOf('\n', headLen)
-  const head = headEnd > 0 ? text.slice(0, headEnd) : text.slice(0, headLen)
-
   const tailStart = text.indexOf('\n', totalChars - tailLen)
-  const tail = tailStart > 0 ? text.slice(tailStart + 1) : text.slice(totalChars - tailLen)
+
+  let head: string, tail: string
+  if (headEnd > 0 && tailStart > 0 && headEnd < tailStart) {
+    head = text.slice(0, headEnd)
+    tail = text.slice(tailStart + 1)
+  } else {
+    head = text.slice(0, headLen)
+    tail = text.slice(totalChars - tailLen)
+  }
 
   const info = `\n... (${label} truncated: ${totalChars} chars → ${maxLen} chars, ${lines.length} lines) ...\n`
 
@@ -75,7 +83,7 @@ function truncate(text: string, maxLen: number, label: string): string {
 }
 
 function containsError(text: string): boolean {
-  return /(?:[A-Z][a-z]+)?[Ee]rror\b|\bERROR\b|\b[Ee]xception\b|\bfail(?:ed|ure)?\b|\bFAIL(?:ED|URE)?\b|[Tt]raceback\b|cannot find\b|npm ERR|exit (?:code|status)/.test(text)
+  return /\b(?:[A-Z][a-z]+)?[Ee]rror\b|\bERROR\b|\b[Ee]xception\b|\bfail(?:ed|ure)?\b|\bFAIL(?:ED|URE)?\b|[Tt]raceback\b|cannot find\b|npm ERR|exit (?:code|status)/.test(text)
 }
 
 export const TokenSaver: Plugin = async (ctx) => {
@@ -96,7 +104,7 @@ export const TokenSaver: Plugin = async (ctx) => {
           output.result = truncate(result, rule.maxChars, "bash output")
           break
         case "read":
-          if (shouldNotTruncate(output.args?.filePath, config?.neverTruncatePatterns ?? [])) return
+          if (shouldNotTruncate(input.args?.filePath, config?.neverTruncatePatterns ?? [])) return
           output.result = truncate(result, rule.maxChars, "file content")
           break
         case "grep":

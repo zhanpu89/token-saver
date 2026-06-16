@@ -1,6 +1,10 @@
 {
   "name": "token-saver-scripts",
   "private": true,
+  "scripts": {
+    "trim": "bun run trim-session.ts",
+    "trim:dry": "bun run trim-session.ts --dry-run"
+  },
   "dependencies": {
     "@opencode-ai/sdk": "latest"
   }
