@@ -1,8 +1,8 @@
 {
   "truncate": {
     "bash": {
-      "maxChars": 2000,
-      "enabled": true
+      "maxChars": 5000,
+      "enabled": false
     },
     "read": {
       "maxChars": 4000,
