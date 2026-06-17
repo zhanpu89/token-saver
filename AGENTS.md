@@ -35,17 +35,41 @@ OPENCODE_BASE_URL=http://localhost:4096 bun run scripts/trim-session.ts
 
 Requires `"type": "module"` in `scripts/package.json` when using `npx tsx`.
 
-## Key quirks
+## Design philosophy: truncation not summarization
 
-- **No build/lint/test/CI infra** — pure TypeScript, no tsconfig, no formatter, no test runner.
-- **Two opencode.json files**: root (`opencode.json` — tool permissions), `.opencode/opencode.json` — plugin loading.
-- **Error-aware truncation**: if tool output contains error/fail/exception/traceback patterns, truncation is skipped entirely (keeps full debug context).
-- **Never-truncate list**: `package.json`, `tsconfig.json`, `opencode.json`, `token-saver.json`, `token-saver.jsonc`, `.env`, `.env.example`, `docker-compose.yml`, `.gitignore`, `Makefile`, `Dockerfile`, `SKILL.md`.
-- **Head-tail truncation**: keeps first 30% + last 70% of output, splits at newlines; uses basename exact match for never-truncate check.
-- **Covered tools**: bash, read, grep, glob, webfetch, websearch, task — each with configurable per-tool threshold.
-- **Task/subagent truncation**: enabled with 3000 chars threshold — subagent output is truncated but enough for normal result delivery.
-- **Session compacting hook** (`experimental.session.compacting`): outputs a dense `Task: X | Files: [...] | Decisions: [...] | Blockers: [...]` summary.
-- **Fully standalone**: no dependency on external skills, pipelines, or parent projects. Install and use in any project.
+Token-saver runs in `tool.execute.after` as a plain TS function — **no LLM call**, no extra token cost. Its truncation is mechanical (head 30% + tail 70%), not semantic.
+
+### Why not summarization
+
+| Approach | Cost | When |
+|---|---|---|
+| Head-tail truncation (token-saver) | Free | Real-time tool output |
+| LLM summarization (compaction + `/trim`) | Extra tokens | Session-level cleanup |
+
+Summarising every tool output with an LLM would cost more tokens than it saves. The mechanical approach works because:
+- `read` files: head has imports/structure, tail has latest code
+- `grep` results: head has top matches, tail has last results
+- `glob` paths: a few examples suffice, 100+ paths are noise
+
+### Escape hatches when truncation is wrong
+
+1. **Error detection** — output containing `Error`/`Exception`/`Traceback`/`cannot find` is never truncated (keeps full debug context)
+2. **Never-truncate list** — `package.json`, `tsconfig.json`, `opencode.json`, `token-saver.json`, `token-saver.jsonc`, `.env`, `.env.example`, `docker-compose.yml`, `.gitignore`, `Makefile`, `Dockerfile`, `SKILL.md` pass through untouched
+3. **Selective reads** — users can `read path offset=N limit=M` to fetch exact sections, bypassing truncation
+4. **Manual compaction** — `/trim` uses LLM for proper semantic summary when needed
+
+### Verification (2026-06-17): 58/58 tests passed
+
+```
+  Config loading:      11/11 ✓  (bash off, rest enabled, thresholds correct)
+  Head-tail truncation: 7/7  ✓  (90.5% reduction on test data, 65.8% on real PLAN.md)
+  Error detection:      9/9  ✓  (all error patterns caught, clean text not flagged)
+  Never-truncate list:  8/8  ✓  (all patterns matched, non-pattern files truncated)
+  Config merge:         4/4  ✓  (deep merge overrides specific fields)
+  Read simulation:      5/5  ✓  (PLAN.md 11738→4009 chars, head+tail+marker correct)
+  Compacting hook:      7/7  ✓  (context injection with all required fields)
+  /trim format:         7/7  ✓  (Task/Status/Files/Decisions/Errors/Pending, <2000 chars)
+  SDK script:           3/3  ✓  (imports @opencode-ai/sdk, exports trimSession)
 
 ## RTK integration
 
@@ -69,11 +93,15 @@ After install, `rtk` intercepts `bash` tool calls transparently via opencode's `
 
 Check RTK savings anytime: `rtk gain`
 
-Verified: `/usr/local/bin/rtk` v0.42.4 — 13 commands, 225 tokens saved (4.0%).
+Verified: `/usr/local/bin/rtk` v0.42.4 — 25 commands, 2K tokens saved (36.7%), single command up to 92%.
 
 ## Architecture notes
 
 - Plugin is a single async function returning hook handlers (event-driven, no classes).
 - SDK script uses `@opencode-ai/sdk` REST client — can connect to running server or start ephemeral one.
-- Config is layered: hardcoded defaults in `token-saver.ts` overridden by `token-saver.json` / `token-saver.jsonc` from worktree.
+- Config is layered: hardcoded defaults in `token-saver.ts` overridden by `token-saver.json` / `token-saver.jsonc` from worktree, then global `~/.config/opencode/token-saver.json`.
 - `.opencode/README.md` is fully standalone and only describes token-saver itself — no external project references.
+- **No build/lint/test infra** — pure TypeScript, no tsconfig, no formatter.
+- **Two opencode.json files**: root (`opencode.json` — tool permissions), `.opencode/opencode.json` — plugin loading.
+
+
