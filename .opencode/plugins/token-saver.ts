@@ -110,18 +110,18 @@ function truncate(text: string, maxLen: number, label: string): string {
 }
 
 function containsError(text: string): boolean {
-  return /\b(?:[A-Z][a-z]+)?[Ee]rror\b|\bERROR\b|\b[Ee]xception\b|\bfail(?:ed|ure)?\b|\bFAIL(?:ED|URE)?\b|[Tt]raceback\b|cannot find\b|npm ERR|\bexit (?:code|status) [1-9][0-9]*/.test(text)
+  return /^[Ee]rror[: ]|\n[Ee]rror[: ]|Traceback \(most recent|FAILED|npm ERR!|exit code [1-9]|exit status [1-9]/.test(text)
 }
 
-export const TokenSaver: Plugin = (ctx) => {
+export const TokenSaver: Plugin = async (ctx) => {
   const worktree = ctx.worktree ?? ctx.directory ?? process.cwd()
   const cfg = loadConfig(worktree)
 
   return {
-    "tool.execute.after": (input, output) => {
-      const result = output.result
-      if (!result || typeof result !== "string") return
-      if (containsError(result)) return
+    "tool.execute.after": async (input, output) => {
+      const text = output.output
+      if (!text || typeof text !== "string") return
+      if (containsError(text)) return
 
       const rule = cfg.truncate[input.tool]
       if (!rule || !rule.enabled) return
@@ -137,10 +137,10 @@ export const TokenSaver: Plugin = (ctx) => {
         websearch: "search results",
         task: "task output",
       }
-      output.result = truncate(result, rule.maxChars, LABELS[input.tool] ?? "output")
+      output.output = truncate(text, rule.maxChars, LABELS[input.tool] ?? "output")
     },
 
-    "experimental.session.compacting": (input, output) => {
+    "experimental.session.compacting": async (input, output) => {
       if (!cfg.compacting.enabled) return
       const maxChars = cfg.compacting.maxSummaryChars
       const keepLast = cfg.trim.defaultKeepLast
