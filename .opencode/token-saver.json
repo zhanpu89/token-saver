@@ -5,27 +5,27 @@
       "enabled": false
     },
     "read": {
-      "maxChars": 4000,
+      "maxChars": 2000,
       "enabled": true
     },
     "grep": {
-      "maxChars": 1500,
+      "maxChars": 800,
       "enabled": true
     },
     "glob": {
-      "maxChars": 1000,
+      "maxChars": 500,
       "enabled": true
     },
     "webfetch": {
-      "maxChars": 4000,
+      "maxChars": 2000,
       "enabled": true
     },
     "websearch": {
-      "maxChars": 3000,
+      "maxChars": 1500,
       "enabled": true
     },
     "task": {
-      "maxChars": 3000,
+      "maxChars": 2000,
       "enabled": true
     }
   },
@@ -36,11 +36,6 @@
     "token-saver.json",
     "token-saver.jsonc",
     ".env",
-    ".env.example",
-    "docker-compose.yml",
-    ".gitignore",
-    "Makefile",
-    "Dockerfile",
     "SKILL.md"
   ],
   "compacting": {

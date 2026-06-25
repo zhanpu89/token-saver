@@ -17,20 +17,18 @@ interface Config {
 function getDefaults(): Config {
   return {
     truncate: {
-      bash: { maxChars: 2000, enabled: true },
-      read: { maxChars: 4000, enabled: true },
-      grep: { maxChars: 1500, enabled: true },
-      glob: { maxChars: 1000, enabled: true },
-      webfetch: { maxChars: 4000, enabled: true },
-      websearch: { maxChars: 3000, enabled: true },
-      task: { maxChars: 3000, enabled: true },
+      bash: { maxChars: 2000, enabled: false },
+      read: { maxChars: 2000, enabled: true },
+      grep: { maxChars: 800, enabled: true },
+      glob: { maxChars: 500, enabled: true },
+      webfetch: { maxChars: 2000, enabled: true },
+      websearch: { maxChars: 1500, enabled: true },
+      task: { maxChars: 2000, enabled: true },
     },
     neverTruncatePatterns: [
       "package.json", "tsconfig.json", "opencode.json",
       "token-saver.json", "token-saver.jsonc",
-      ".env", ".env.example", "docker-compose.yml",
-      ".gitignore", "Makefile", "Dockerfile",
-      "SKILL.md",
+      ".env", "SKILL.md",
     ],
     compacting: { enabled: true, maxSummaryChars: 2000 },
     trim: { defaultKeepLast: 10, maxSummaryChars: 2000 },
@@ -110,7 +108,7 @@ function truncate(text: string, maxLen: number, label: string): string {
 }
 
 function containsError(text: string): boolean {
-  return /^[Ee]rror[: ]|\n[Ee]rror[: ]|Traceback \(most recent|FAILED|npm ERR!|exit code [1-9]|exit status [1-9]/.test(text)
+  return /Traceback \(most recent|Uncaught |SyntaxError:|TypeError:|ReferenceError:|RangeError:|panic:|fatal error:/u.test(text)
 }
 
 export const TokenSaver: Plugin = async (ctx) => {
